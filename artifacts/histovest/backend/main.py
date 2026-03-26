@@ -85,6 +85,103 @@ def ohlcv_to_json(df: pd.DataFrame) -> list:
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 
 
+def get_fundamentals(stock: yf.Ticker, start_date: datetime, start_price: float) -> dict:
+    result = {"pe_ratio": None, "pb_ratio": None, "trailing_return_pct": None}
+
+    # ── 12-month trailing return ────────────────────────────────────────────
+    try:
+        pre_start = (start_date - timedelta(days=400)).strftime("%Y-%m-%d")
+        pre_end = (start_date + timedelta(days=10)).strftime("%Y-%m-%d")
+        pre_df = stock.history(start=pre_start, end=pre_end, auto_adjust=True)
+        if not pre_df.empty:
+            pre_df.index = pd.to_datetime(pre_df.index)
+            pre_df.index = pre_df.index.tz_localize(None) if pre_df.index.tzinfo else pre_df.index
+            pre_df = pre_df.sort_index()
+            target_12m = start_date - timedelta(days=365)
+            # nearest trading day at or after target_12m
+            candidates = pre_df[pre_df.index >= target_12m]
+            if candidates.empty:
+                candidates = pre_df
+            price_12m_ago = float(candidates.iloc[0]["Close"])
+            if price_12m_ago > 0:
+                result["trailing_return_pct"] = round(
+                    (start_price / price_12m_ago - 1) * 100, 2
+                )
+    except Exception as e:
+        print(f"Trailing return error: {e}")
+
+    # ── Income statement → EPS → P/E ───────────────────────────────────────
+    try:
+        for attr in ("income_stmt", "financials"):
+            stmt = getattr(stock, attr, None)
+            if stmt is None or stmt.empty:
+                continue
+            cols = [(pd.Timestamp(c), c) for c in stmt.columns]
+            before = [(ts, c) for ts, c in cols if ts <= pd.Timestamp(start_date)]
+            if not before:
+                continue
+            _, best_col = max(before, key=lambda x: x[0])
+            for row_name in ("Basic EPS", "Diluted EPS"):
+                if row_name in stmt.index:
+                    eps_val = stmt.loc[row_name, best_col]
+                    if eps_val is not None:
+                        eps = float(eps_val)
+                        if not math.isnan(eps) and eps > 0:
+                            result["pe_ratio"] = round(start_price / eps, 1)
+                            break
+            if result["pe_ratio"] is not None:
+                break
+    except Exception as e:
+        print(f"P/E error: {e}")
+
+    # ── Balance sheet → book value per share → P/B ─────────────────────────
+    try:
+        for attr in ("balance_sheet", "quarterly_balance_sheet"):
+            bs = getattr(stock, attr, None)
+            if bs is None or bs.empty:
+                continue
+            cols = [(pd.Timestamp(c), c) for c in bs.columns]
+            before = [(ts, c) for ts, c in cols if ts <= pd.Timestamp(start_date)]
+            if not before:
+                continue
+            _, best_col = max(before, key=lambda x: x[0])
+
+            equity = None
+            for row_name in (
+                "Stockholders Equity",
+                "Total Stockholders Equity",
+                "Common Stock Equity",
+                "Total Equity Gross Minority Interest",
+            ):
+                if row_name in bs.index:
+                    v = bs.loc[row_name, best_col]
+                    if v is not None and not math.isnan(float(v)):
+                        equity = float(v)
+                        break
+
+            shares = None
+            for row_name in (
+                "Ordinary Shares Number",
+                "Share Issued",
+                "Common Stock Shares Outstanding",
+            ):
+                if row_name in bs.index:
+                    v = bs.loc[row_name, best_col]
+                    if v is not None and not math.isnan(float(v)):
+                        shares = float(v)
+                        break
+
+            if equity and shares and shares > 0:
+                bvps = equity / shares
+                if bvps > 0:
+                    result["pb_ratio"] = round(start_price / bvps, 2)
+                break
+    except Exception as e:
+        print(f"P/B error: {e}")
+
+    return result
+
+
 @app.get("/", response_class=HTMLResponse)
 def serve_index():
     index_path = os.path.join(STATIC_DIR, "index.html")
@@ -167,6 +264,8 @@ def get_challenge():
             except Exception:
                 company_name = ticker
 
+            fundamentals = get_fundamentals(stock, start_date, stock_start_price)
+
             return {
                 "challenge": challenge_json,
                 "reveal": reveal_json,
@@ -182,7 +281,8 @@ def get_challenge():
                     "ticker": ticker,
                     "company_name": company_name,
                     "challenge_year": start_date.year,
-                }
+                },
+                "fundamentals": fundamentals,
             }
 
         except Exception as e:

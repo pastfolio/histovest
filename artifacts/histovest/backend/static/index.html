@@ -298,6 +298,67 @@
       font-weight: 600;
     }
 
+    .fundamentals-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 20px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .fundamentals-header {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--text-muted);
+    }
+
+    .fundamentals-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    @media (max-width: 500px) {
+      .fundamentals-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    .fundamental-stat {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 11px 14px;
+    }
+
+    .fundamental-stat .f-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-muted);
+      margin-bottom: 5px;
+    }
+
+    .fundamental-stat .f-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .fundamental-stat .f-value.positive { color: var(--green); }
+    .fundamental-stat .f-value.negative { color: var(--red); }
+    .fundamental-stat .f-value.na       { color: var(--text-muted); font-size: 15px; font-weight: 500; }
+
+    .fundamentals-note {
+      font-size: 11px;
+      color: var(--text-muted);
+      opacity: 0.7;
+    }
+
     .loading {
       display: flex;
       align-items: center;

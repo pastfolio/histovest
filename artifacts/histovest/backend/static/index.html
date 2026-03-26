@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HistoVest — Test Your Market Instincts</title>
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #161b27;
+      --surface2: #1e2535;
+      --border: #2a3348;
+      --text: #e8ecf0;
+      --text-muted: #8892a4;
+      --green: #26a69a;
+      --red: #ef5350;
+      --blue: #3b82f6;
+      --yellow: #f59e0b;
+      --accent: #6366f1;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--surface);
+    }
+
+    header .logo {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--text);
+    }
+
+    header .logo span {
+      color: var(--accent);
+    }
+
+    header .tagline {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-left: auto;
+    }
+
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      max-width: 1100px;
+      margin: 0 auto;
+      width: 100%;
+      padding: 24px 16px;
+      gap: 20px;
+    }
+
+    .instruction-bar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .instruction-bar .badge {
+      background: var(--accent);
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+    }
+
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .chart-header {
+      padding: 14px 20px 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .chart-header .chart-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .chart-header .chart-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-left: auto;
+    }
+
+    .chart-legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    #chart-container {
+      height: 420px;
+      width: 100%;
+    }
+
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .decision-prompt {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      text-align: center;
+    }
+
+    .decision-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 12px 32px;
+      border-radius: 8px;
+      border: none;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      letter-spacing: 0.02em;
+    }
+
+    .btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
+    .btn:active { transform: translateY(0); filter: brightness(0.95); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .btn-buy  { background: var(--green); color: white; }
+    .btn-hold { background: var(--yellow); color: #1a1a1a; }
+    .btn-sell { background: var(--red); color: white; }
+    .btn-next { background: var(--accent); color: white; font-size: 14px; }
+    .btn-skip { background: var(--surface2); color: var(--text-muted); font-size: 14px; border: 1px solid var(--border); }
+
+    .result-panel {
+      display: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      gap: 20px;
+      flex-direction: column;
+    }
+
+    .result-panel.visible { display: flex; }
+
+    .result-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .result-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+
+    .result-stat {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+
+    .result-stat .label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 6px;
+    }
+
+    .result-stat .value {
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .result-stat .value.positive { color: var(--green); }
+    .result-stat .value.negative { color: var(--red); }
+    .result-stat .value.neutral  { color: var(--text); }
+
+    .result-verdict {
+      border-radius: 8px;
+      padding: 14px 18px;
+      font-size: 15px;
+      font-weight: 600;
+      border-left: 4px solid;
+    }
+
+    .result-verdict.great { background: rgba(38,166,154,0.12); border-color: var(--green); color: var(--green); }
+    .result-verdict.ok    { background: rgba(245,158,11,0.12); border-color: var(--yellow); color: var(--yellow); }
+    .result-verdict.miss  { background: rgba(239,83,80,0.12);  border-color: var(--red);    color: var(--red);    }
+
+    .result-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 420px;
+      flex-direction: column;
+      gap: 16px;
+      color: var(--text-muted);
+    }
+
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-state {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 420px;
+      flex-direction: column;
+      gap: 12px;
+      color: var(--red);
+      text-align: center;
+    }
+
+    .score-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 20px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .score-bar .score-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .score-bar .score-num {
+      font-weight: 700;
+      font-size: 15px;
+    }
+
+    .score-bar .score-num.green { color: var(--green); }
+    .score-bar .score-num.red   { color: var(--red); }
+    .score-bar .score-sep { color: var(--border); }
+
+    .your-choice-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .your-choice-badge.buy  { background: rgba(38,166,154,0.15); color: var(--green); }
+    .your-choice-badge.hold { background: rgba(245,158,11,0.15);  color: var(--yellow); }
+    .your-choice-badge.sell { background: rgba(239,83,80,0.15);   color: var(--red); }
+
+    .reveal-note {
+      font-size: 13px;
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    @media (max-width: 600px) {
+      .btn { padding: 10px 20px; font-size: 14px; }
+      #chart-container { height: 320px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Histo<span>Vest</span></div>
+  <div class="tagline">Test your market instincts with real historical data</div>
+</header>
+
+<div class="main">
+
+  <div class="score-bar">
+    <div class="score-item">
+      Challenges played: <span class="score-num" id="score-played">0</span>
+    </div>
+    <div class="score-sep">|</div>
+    <div class="score-item">
+      Beat S&amp;P 500: <span class="score-num green" id="score-wins">0</span>
+    </div>
+    <div class="score-sep">|</div>
+    <div class="score-item">
+      Lost to S&amp;P 500: <span class="score-num red" id="score-losses">0</span>
+    </div>
+  </div>
+
+  <div class="instruction-bar">
+    <span class="badge">How it works</span>
+    You're looking at <strong style="color:var(--text)">12 months</strong> of real historical price action from an anonymous S&amp;P 500 stock. No ticker, no dates. Decide: Buy, Hold, or Sell — then see the next 6 months.
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-legend-dot" style="background: var(--accent)"></div>
+      <div class="chart-title">Anonymous Stock · 12-Month Challenge Window</div>
+      <div class="chart-subtitle" id="chart-meta"></div>
+    </div>
+    <div id="chart-loading" class="loading">
+      <div class="spinner"></div>
+      <div>Loading real stock data…</div>
+    </div>
+    <div id="chart-error" class="error-state" style="display:none">
+      <div style="font-size:28px">⚠️</div>
+      <div id="error-msg">Failed to load data. Please try again.</div>
+      <button class="btn btn-next" onclick="loadChallenge()">Retry</button>
+    </div>
+    <div id="chart-container" style="display:none"></div>
+  </div>
+
+  <div class="controls" id="decision-controls" style="display:none">
+    <div class="decision-prompt">What's your call?</div>
+    <div class="decision-buttons">
+      <button class="btn btn-buy"  onclick="makeDecision('buy')">📈 Buy</button>
+      <button class="btn btn-hold" onclick="makeDecision('hold')">⏸ Hold</button>
+      <button class="btn btn-sell" onclick="makeDecision('sell')">📉 Sell</button>
+    </div>
+    <div class="reveal-note" id="decision-note">Choose based on the 12-month chart above. After you decide, the next 6 months will be revealed.</div>
+  </div>
+
+  <div class="result-panel" id="result-panel">
+    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap">
+      <div class="result-title">6-Month Outcome</div>
+      <div id="choice-badge"></div>
+    </div>
+    <div class="result-grid" id="result-grid"></div>
+    <div class="result-verdict" id="result-verdict"></div>
+    <div class="result-actions">
+      <button class="btn btn-skip" onclick="loadChallenge()">Skip to Next</button>
+      <button class="btn btn-next" onclick="loadChallenge()">Next Challenge →</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let chartInstance = null;
+  let candleSeries = null;
+  let revealSeries = null;
+  let volumeSeries = null;
+  let spxSeries = null;
+  let currentData = null;
+  let userDecision = null;
+
+  const scoreState = { played: 0, wins: 0, losses: 0 };
+
+  function showLoading() {
+    document.getElementById('chart-loading').style.display = 'flex';
+    document.getElementById('chart-error').style.display = 'none';
+    document.getElementById('chart-container').style.display = 'none';
+    document.getElementById('decision-controls').style.display = 'none';
+    document.getElementById('result-panel').classList.remove('visible');
+    document.getElementById('chart-meta').textContent = '';
+  }
+
+  function showError(msg) {
+    document.getElementById('chart-loading').style.display = 'none';
+    document.getElementById('chart-error').style.display = 'flex';
+    document.getElementById('error-msg').textContent = msg || 'Failed to load data.';
+    document.getElementById('chart-container').style.display = 'none';
+    document.getElementById('decision-controls').style.display = 'none';
+  }
+
+  function showChart() {
+    document.getElementById('chart-loading').style.display = 'none';
+    document.getElementById('chart-error').style.display = 'none';
+    document.getElementById('chart-container').style.display = 'block';
+    document.getElementById('decision-controls').style.display = 'flex';
+    document.getElementById('result-panel').classList.remove('visible');
+  }
+
+  function normalizeCandles(candles) {
+    return candles.map(c => ({
+      time: c.time,
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+    }));
+  }
+
+  function normalizeVolume(candles) {
+    return candles.map(c => ({
+      time: c.time,
+      value: c.volume,
+      color: c.close >= c.open ? 'rgba(38,166,154,0.3)' : 'rgba(239,83,80,0.3)',
+    }));
+  }
+
+  function normalizeLine(candles) {
+    return candles.map(c => ({ time: c.time, value: c.close }));
+  }
+
+  function buildChart(data) {
+    const container = document.getElementById('chart-container');
+
+    if (chartInstance) {
+      chartInstance.remove();
+      chartInstance = null;
+    }
+
+    chartInstance = LightweightCharts.createChart(container, {
+      layout: {
+        background: { color: '#161b27' },
+        textColor: '#8892a4',
+      },
+      grid: {
+        vertLines: { color: '#1e2535' },
+        horzLines: { color: '#1e2535' },
+      },
+      crosshair: {
+        mode: LightweightCharts.CrosshairMode.Normal,
+      },
+      rightPriceScale: {
+        borderColor: '#2a3348',
+        scaleMargins: { top: 0.1, bottom: 0.25 },
+      },
+      timeScale: {
+        borderColor: '#2a3348',
+        timeVisible: false,
+        secondsVisible: false,
+        tickMarkFormatter: () => '',
+      },
+      handleScroll: true,
+      handleScale: true,
+    });
+
+    candleSeries = chartInstance.addCandlestickSeries({
+      upColor: '#26a69a',
+      downColor: '#ef5350',
+      borderUpColor: '#26a69a',
+      borderDownColor: '#ef5350',
+      wickUpColor: '#26a69a',
+      wickDownColor: '#ef5350',
+    });
+
+    volumeSeries = chartInstance.addHistogramSeries({
+      priceFormat: { type: 'volume' },
+      priceScaleId: 'volume',
+    });
+
+    chartInstance.priceScale('volume').applyOptions({
+      scaleMargins: { top: 0.8, bottom: 0 },
+    });
+
+    const challengeCandles = normalizeCandles(data.challenge);
+    const challengeVolume = normalizeVolume(data.challenge);
+
+    candleSeries.setData(challengeCandles);
+    volumeSeries.setData(challengeVolume);
+
+    chartInstance.timeScale().fitContent();
+
+    const count = data.challenge.length;
+    document.getElementById('chart-meta').textContent = `${count} trading days shown`;
+  }
+
+  function revealResult(data, decision) {
+    const revealCandles = normalizeCandles(data.reveal);
+    const revealVolume = normalizeVolume(data.reveal);
+
+    revealSeries = chartInstance.addCandlestickSeries({
+      upColor: 'rgba(99,102,241,0.8)',
+      downColor: 'rgba(99,102,241,0.5)',
+      borderUpColor: '#6366f1',
+      borderDownColor: '#6366f1',
+      wickUpColor: '#6366f1',
+      wickDownColor: '#6366f1',
+    });
+
+    revealSeries.setData(revealCandles);
+
+    const revealVolumeStyled = revealVolume.map(v => ({
+      ...v,
+      color: 'rgba(99,102,241,0.25)',
+    }));
+
+    const allVolume = normalizeVolume(data.challenge).concat(revealVolumeStyled);
+    volumeSeries.setData(allVolume);
+
+    chartInstance.timeScale().fitContent();
+
+    const meta = data.meta;
+    const entryPrice = meta.stock_end_price;
+    const exitPrice = meta.stock_reveal_end_price;
+
+    let stockReturn = 0;
+    if (entryPrice > 0) {
+      stockReturn = (exitPrice - entryPrice) / entryPrice * 100;
+    }
+
+    const spxReturn = meta.spx_return_pct;
+
+    let userReturn = 0;
+    if (decision === 'buy') userReturn = stockReturn;
+    else if (decision === 'sell') userReturn = -stockReturn;
+    else userReturn = 0;
+
+    const grid = document.getElementById('result-grid');
+    grid.innerHTML = '';
+
+    function statEl(label, value, cls) {
+      const d = document.createElement('div');
+      d.className = 'result-stat';
+      d.innerHTML = `<div class="label">${label}</div><div class="value ${cls}">${value}</div>`;
+      return d;
+    }
+
+    const fmt = n => (n >= 0 ? '+' : '') + n.toFixed(2) + '%';
+
+    grid.appendChild(statEl(
+      'Stock move (6 mo)',
+      fmt(stockReturn),
+      stockReturn >= 0 ? 'positive' : 'negative'
+    ));
+
+    grid.appendChild(statEl(
+      'S&P 500 return',
+      spxReturn != null ? fmt(spxReturn) : 'N/A',
+      spxReturn != null ? (spxReturn >= 0 ? 'positive' : 'negative') : 'neutral'
+    ));
+
+    grid.appendChild(statEl(
+      'Your return',
+      decision === 'hold' ? '0.00% (held cash)' : fmt(userReturn),
+      decision === 'hold' ? 'neutral' : (userReturn >= 0 ? 'positive' : 'negative')
+    ));
+
+    if (spxReturn != null) {
+      const diff = userReturn - spxReturn;
+      grid.appendChild(statEl(
+        'vs S&P 500',
+        fmt(diff),
+        diff >= 0 ? 'positive' : 'negative'
+      ));
+    }
+
+    const verdict = document.getElementById('result-verdict');
+    let verdictClass, verdictText;
+
+    if (decision === 'hold') {
+      verdictClass = 'ok';
+      verdictText = spxReturn != null
+        ? `You held cash — safe play. The S&P 500 moved ${fmt(spxReturn)} in the same period.`
+        : 'You held cash — safe play.';
+    } else {
+      const diff = spxReturn != null ? userReturn - spxReturn : null;
+      if (diff != null && diff > 2) {
+        verdictClass = 'great';
+        verdictText = `Great call! You beat the S&P 500 by ${diff.toFixed(2)} percentage points.`;
+        scoreState.wins++;
+      } else if (diff != null && diff < -2) {
+        verdictClass = 'miss';
+        verdictText = `Tough break. You underperformed the S&P 500 by ${Math.abs(diff).toFixed(2)} percentage points.`;
+        scoreState.losses++;
+      } else {
+        verdictClass = 'ok';
+        verdictText = `Close match. Your return was roughly in line with the S&P 500.`;
+        if (diff != null && diff >= 0) scoreState.wins++; else scoreState.losses++;
+      }
+    }
+
+    scoreState.played++;
+    updateScore();
+
+    verdict.className = `result-verdict ${verdictClass}`;
+    verdict.textContent = verdictText;
+
+    const badge = document.getElementById('choice-badge');
+    badge.innerHTML = `<span class="your-choice-badge ${decision}">You chose: ${decision.toUpperCase()}</span>`;
+
+    document.getElementById('result-panel').classList.add('visible');
+    document.getElementById('decision-controls').style.display = 'none';
+  }
+
+  function updateScore() {
+    document.getElementById('score-played').textContent = scoreState.played;
+    document.getElementById('score-wins').textContent = scoreState.wins;
+    document.getElementById('score-losses').textContent = scoreState.losses;
+  }
+
+  function makeDecision(decision) {
+    if (!currentData) return;
+    userDecision = decision;
+
+    const decisionBtns = document.querySelectorAll('.btn-buy, .btn-hold, .btn-sell');
+    decisionBtns.forEach(b => b.disabled = true);
+
+    document.getElementById('decision-note').textContent = 'Revealing the next 6 months…';
+
+    revealResult(currentData, decision);
+  }
+
+  async function loadChallenge() {
+    showLoading();
+    currentData = null;
+    userDecision = null;
+
+    const decisionBtns = document.querySelectorAll('.btn-buy, .btn-hold, .btn-sell');
+    decisionBtns.forEach(b => b.disabled = false);
+
+    document.getElementById('decision-note').textContent = 'Choose based on the 12-month chart above. After you decide, the next 6 months will be revealed.';
+
+    try {
+      const resp = await fetch('/challenge');
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${resp.status}`);
+      }
+
+      const data = await resp.json();
+
+      if (!data.challenge || data.challenge.length === 0) {
+        throw new Error('No data received');
+      }
+
+      currentData = data;
+      showChart();
+      buildChart(data);
+
+    } catch (e) {
+      showError(`Could not load challenge: ${e.message}`);
+    }
+  }
+
+  loadChallenge();
+</script>
+</body>
+</html>

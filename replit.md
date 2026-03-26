@@ -2,7 +2,18 @@
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+pnpm workspace monorepo. Contains the HistoVest app (Python/FastAPI) alongside the base TypeScript infrastructure.
+
+## HistoVest App
+
+HistoVest is a stock market game where users see 12 months of anonymous historical candlestick data and decide Buy, Hold, or Sell. After deciding, the next 6 months are revealed and their return is compared to the S&P 500.
+
+- **Backend**: Python FastAPI (`artifacts/histovest/backend/main.py`) served by uvicorn on port 26110
+- **Frontend**: Plain HTML/CSS/JS (`artifacts/histovest/backend/static/index.html`) served by FastAPI's StaticFiles
+- **Data**: yfinance fetches real historical OHLCV data for random S&P 500 stocks, random 12-month windows between 1995–2018
+- **Charts**: TradingView Lightweight Charts (CDN) for candlestick rendering
+- **API endpoint**: `GET /challenge` — returns challenge candles (12 mo), reveal candles (6 mo), SPX data, and metadata
+- **Run command**: `cd /home/runner/workspace/artifacts/histovest/backend && uvicorn main:app --host 0.0.0.0 --port $PORT --reload`
 
 ## Stack
 

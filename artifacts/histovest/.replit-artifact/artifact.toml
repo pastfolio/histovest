@@ -1,0 +1,22 @@
+kind = "web"
+previewPath = "/"
+title = "HistoVest"
+version = "1.0.0"
+id = "artifacts/histovest"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 26110
+
+[services.development]
+run = "bash -c 'cd /home/runner/workspace/artifacts/histovest/backend && uvicorn main:app --host 0.0.0.0 --port $PORT --reload'"
+
+[services.env]
+PORT = "26110"
+BASE_PATH = "/"

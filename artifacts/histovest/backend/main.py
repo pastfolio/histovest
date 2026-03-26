@@ -6,9 +6,9 @@ from typing import Literal
 
 import yfinance as yf
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="HistoVest API")
@@ -80,6 +80,24 @@ def ohlcv_to_json(df: pd.DataFrame) -> list:
             "volume": int(v) if not math.isnan(v) else 0,
         })
     return result
+
+
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+
+
+@app.get("/", response_class=HTMLResponse)
+def serve_index():
+    index_path = os.path.join(STATIC_DIR, "index.html")
+    with open(index_path, "r") as f:
+        content = f.read()
+    return HTMLResponse(
+        content=content,
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        }
+    )
 
 
 @app.get("/challenge")

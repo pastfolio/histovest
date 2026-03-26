@@ -238,6 +238,66 @@
       justify-content: flex-end;
     }
 
+    .unmask-panel {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .unmask-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      padding: 10px 18px 8px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .unmask-body {
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+
+    .unmask-company {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.5px;
+      line-height: 1.1;
+    }
+
+    .unmask-ticker {
+      display: inline-flex;
+      align-items: center;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--accent);
+      font-family: var(--app-font-mono, monospace);
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+    }
+
+    .unmask-year {
+      margin-left: auto;
+      font-size: 13px;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .unmask-year strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
     .loading {
       display: flex;
       align-items: center;
@@ -388,6 +448,14 @@
     </div>
     <div class="result-grid" id="result-grid"></div>
     <div class="result-verdict" id="result-verdict"></div>
+    <div class="unmask-panel" id="unmask-panel" style="display:none">
+      <div class="unmask-label">🎭 The stock was…</div>
+      <div class="unmask-body">
+        <div class="unmask-company" id="unmask-company"></div>
+        <div class="unmask-ticker" id="unmask-ticker"></div>
+        <div class="unmask-year" id="unmask-year"></div>
+      </div>
+    </div>
     <div class="result-actions">
       <button class="btn btn-skip" onclick="loadChallenge()">Skip to Next</button>
       <button class="btn btn-next" onclick="loadChallenge()">Next Challenge →</button>
@@ -413,6 +481,7 @@
     document.getElementById('chart-container').style.display = 'none';
     document.getElementById('decision-controls').style.display = 'none';
     document.getElementById('result-panel').classList.remove('visible');
+    document.getElementById('unmask-panel').style.display = 'none';
     document.getElementById('chart-meta').textContent = '';
   }
 
@@ -631,6 +700,24 @@
 
     const badge = document.getElementById('choice-badge');
     badge.innerHTML = `<span class="your-choice-badge ${decision}">You chose: ${decision.toUpperCase()}</span>`;
+
+    const unmaskPanel = document.getElementById('unmask-panel');
+    const unmaskCompany = document.getElementById('unmask-company');
+    const unmaskTicker = document.getElementById('unmask-ticker');
+    const unmaskYear = document.getElementById('unmask-year');
+
+    const ticker = meta.ticker || '';
+    const companyName = meta.company_name || ticker;
+    const year = meta.challenge_year;
+
+    if (ticker) {
+      unmaskCompany.textContent = companyName;
+      unmaskTicker.textContent = ticker;
+      unmaskYear.innerHTML = year ? `Challenge window: <strong>${year}–${year + 1}</strong>` : '';
+      unmaskPanel.style.display = 'block';
+    } else {
+      unmaskPanel.style.display = 'none';
+    }
 
     document.getElementById('result-panel').classList.add('visible');
     document.getElementById('decision-controls').style.display = 'none';

@@ -161,6 +161,12 @@ def get_challenge():
             else:
                 spx_return_pct = None
 
+            try:
+                info = stock.info
+                company_name = info.get("longName") or info.get("shortName") or ticker
+            except Exception:
+                company_name = ticker
+
             return {
                 "challenge": challenge_json,
                 "reveal": reveal_json,
@@ -173,6 +179,9 @@ def get_challenge():
                     "spx_return_pct": spx_return_pct,
                     "challenge_candles": len(challenge_json),
                     "reveal_candles": len(reveal_json),
+                    "ticker": ticker,
+                    "company_name": company_name,
+                    "challenge_year": start_date.year,
                 }
             }
 

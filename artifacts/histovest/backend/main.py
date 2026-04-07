@@ -86,29 +86,16 @@ STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 
 
 def get_fundamentals(stock: yf.Ticker, start_date: datetime, start_price: float) -> dict:
-    result = {"pe_ratio": None, "pb_ratio": None, "trailing_return_pct": None}
+    result = {"pe_ratio": None, "sector": None, "market_cap_category": None}
 
-    # ── 12-month trailing return ────────────────────────────────────────────
+    # ── Sector from info ────────────────────────────────────────────────────
     try:
-        pre_start = (start_date - timedelta(days=400)).strftime("%Y-%m-%d")
-        pre_end = (start_date + timedelta(days=10)).strftime("%Y-%m-%d")
-        pre_df = stock.history(start=pre_start, end=pre_end, auto_adjust=True)
-        if not pre_df.empty:
-            pre_df.index = pd.to_datetime(pre_df.index)
-            pre_df.index = pre_df.index.tz_localize(None) if pre_df.index.tzinfo else pre_df.index
-            pre_df = pre_df.sort_index()
-            target_12m = start_date - timedelta(days=365)
-            # nearest trading day at or after target_12m
-            candidates = pre_df[pre_df.index >= target_12m]
-            if candidates.empty:
-                candidates = pre_df
-            price_12m_ago = float(candidates.iloc[0]["Close"])
-            if price_12m_ago > 0:
-                result["trailing_return_pct"] = round(
-                    (start_price / price_12m_ago - 1) * 100, 2
-                )
+        info = stock.info
+        sector = info.get("sector") or info.get("sectorDisp")
+        if sector:
+            result["sector"] = sector
     except Exception as e:
-        print(f"Trailing return error: {e}")
+        print(f"Sector error: {e}")
 
     # ── Income statement → EPS → P/E ───────────────────────────────────────
     try:
@@ -134,8 +121,16 @@ def get_fundamentals(stock: yf.Ticker, start_date: datetime, start_price: float)
     except Exception as e:
         print(f"P/E error: {e}")
 
-    # ── Balance sheet → book value per share → P/B ─────────────────────────
+    # ── Historical market cap → size category ──────────────────────────────
+    def cap_category(mkt_cap: float) -> str:
+        if mkt_cap >= 200e9:  return "Mega Cap"
+        if mkt_cap >= 10e9:   return "Large Cap"
+        if mkt_cap >= 2e9:    return "Mid Cap"
+        if mkt_cap >= 300e6:  return "Small Cap"
+        return "Micro Cap"
+
     try:
+        shares = None
         for attr in ("balance_sheet", "quarterly_balance_sheet"):
             bs = getattr(stock, attr, None)
             if bs is None or bs.empty:
@@ -143,41 +138,41 @@ def get_fundamentals(stock: yf.Ticker, start_date: datetime, start_price: float)
             cols = [(pd.Timestamp(c), c) for c in bs.columns]
             before = [(ts, c) for ts, c in cols if ts <= pd.Timestamp(start_date)]
             if not before:
+                before = [(pd.Timestamp(c), c) for c in bs.columns]
+            if not before:
                 continue
             _, best_col = max(before, key=lambda x: x[0])
-
-            equity = None
-            for row_name in (
-                "Stockholders Equity",
-                "Total Stockholders Equity",
-                "Common Stock Equity",
-                "Total Equity Gross Minority Interest",
-            ):
-                if row_name in bs.index:
-                    v = bs.loc[row_name, best_col]
-                    if v is not None and not math.isnan(float(v)):
-                        equity = float(v)
-                        break
-
-            shares = None
             for row_name in (
                 "Ordinary Shares Number",
                 "Share Issued",
                 "Common Stock Shares Outstanding",
+                "Diluted Average Shares",
             ):
                 if row_name in bs.index:
                     v = bs.loc[row_name, best_col]
-                    if v is not None and not math.isnan(float(v)):
-                        shares = float(v)
-                        break
-
-            if equity and shares and shares > 0:
-                bvps = equity / shares
-                if bvps > 0:
-                    result["pb_ratio"] = round(start_price / bvps, 2)
+                    if v is not None:
+                        try:
+                            fv = float(v)
+                            if not math.isnan(fv) and fv > 0:
+                                shares = fv
+                                break
+                        except (TypeError, ValueError):
+                            pass
+            if shares:
                 break
+
+        if shares:
+            result["market_cap_category"] = cap_category(shares * start_price)
+        else:
+            # fall back to current market cap from info (already fetched for sector)
+            try:
+                mc = stock.info.get("marketCap")
+                if mc and mc > 0:
+                    result["market_cap_category"] = cap_category(float(mc))
+            except Exception:
+                pass
     except Exception as e:
-        print(f"P/B error: {e}")
+        print(f"Market cap error: {e}")
 
     return result
 

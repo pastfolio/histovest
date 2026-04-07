@@ -173,6 +173,8 @@
     .btn-skip { background: var(--surface2); color: var(--text-muted); font-size: 14px; border: 1px solid var(--border); }
 
     .result-panel {
+      opacity: 0;
+      transition: opacity 0.5s ease;
       display: none;
       background: var(--surface);
       border: 1px solid var(--border);
@@ -183,6 +185,7 @@
     }
 
     .result-panel.visible { display: flex; }
+    .result-panel.fade-in { opacity: 1; }
 
     .result-title {
       font-size: 16px;
@@ -492,6 +495,12 @@
     <div id="chart-container" style="display:none"></div>
   </div>
 
+  <div class="fundamentals-panel" id="fundamentals-panel" style="display:none">
+    <div class="fundamentals-header">Snapshot at challenge start</div>
+    <div class="fundamentals-grid" id="fundamentals-grid"></div>
+    <div class="fundamentals-note">Based on financials closest to the start of the 12-month window</div>
+  </div>
+
   <div class="controls" id="decision-controls" style="display:none">
     <div class="decision-prompt">What's your call?</div>
     <div class="decision-buttons">
@@ -541,7 +550,10 @@
     document.getElementById('chart-error').style.display = 'none';
     document.getElementById('chart-container').style.display = 'none';
     document.getElementById('decision-controls').style.display = 'none';
-    document.getElementById('result-panel').classList.remove('visible');
+    document.getElementById('fundamentals-panel').style.display = 'none';
+    const rp = document.getElementById('result-panel');
+    rp.classList.remove('visible');
+    rp.classList.remove('fade-in');
     document.getElementById('unmask-panel').style.display = 'none';
     document.getElementById('chart-meta').textContent = '';
   }
@@ -559,7 +571,30 @@
     document.getElementById('chart-error').style.display = 'none';
     document.getElementById('chart-container').style.display = 'block';
     document.getElementById('decision-controls').style.display = 'flex';
-    document.getElementById('result-panel').classList.remove('visible');
+    const rp = document.getElementById('result-panel');
+    rp.classList.remove('visible');
+    rp.classList.remove('fade-in');
+  }
+
+  function showFundamentals(data) {
+    const f = data.fundamentals || {};
+    const grid = document.getElementById('fundamentals-grid');
+    grid.innerHTML = '';
+
+    function fStat(label, value, cls) {
+      const d = document.createElement('div');
+      d.className = 'fundamental-stat';
+      const valClass = cls ? `f-value ${cls}` : 'f-value';
+      d.innerHTML = `<div class="f-label">${label}</div><div class="${valClass}">${value ?? '<span class="na">N/A</span>'}</div>`;
+      return d;
+    }
+
+    const pe = f.pe_ratio != null ? f.pe_ratio.toFixed(1) + 'x' : null;
+    grid.appendChild(fStat('P/E Ratio', pe, pe == null ? 'na' : ''));
+    grid.appendChild(fStat('Sector', f.sector ?? null, f.sector == null ? 'na' : ''));
+    grid.appendChild(fStat('Market Cap', f.market_cap_category ?? null, f.market_cap_category == null ? 'na' : ''));
+
+    document.getElementById('fundamentals-panel').style.display = 'flex';
   }
 
   function normalizeCandles(candles) {
@@ -603,6 +638,7 @@
       },
       crosshair: {
         mode: LightweightCharts.CrosshairMode.Normal,
+        vertLine: { labelVisible: false },
       },
       rightPriceScale: {
         borderColor: '#2a3348',
@@ -661,127 +697,126 @@
       wickDownColor: '#6366f1',
     });
 
-    revealSeries.setData(revealCandles);
-
     const revealVolumeStyled = revealVolume.map(v => ({
       ...v,
       color: 'rgba(99,102,241,0.25)',
     }));
 
     const allVolume = normalizeVolume(data.challenge).concat(revealVolumeStyled);
-    volumeSeries.setData(allVolume);
 
-    chartInstance.timeScale().fitContent();
+    // Animate reveal candles one by one over 1.5 s
+    const totalMs = 1500;
+    const msPerCandle = Math.max(16, totalMs / revealCandles.length);
+    let i = 0;
 
-    const meta = data.meta;
-    const entryPrice = meta.stock_end_price;
-    const exitPrice = meta.stock_reveal_end_price;
+    function showOutcomePanel() {
+      volumeSeries.setData(allVolume);
+      chartInstance.timeScale().fitContent();
 
-    let stockReturn = 0;
-    if (entryPrice > 0) {
-      stockReturn = (exitPrice - entryPrice) / entryPrice * 100;
-    }
+      const meta = data.meta;
+      const entryPrice = meta.stock_end_price;
+      const exitPrice = meta.stock_reveal_end_price;
 
-    const spxReturn = meta.spx_return_pct;
-
-    let userReturn = 0;
-    if (decision === 'buy') userReturn = stockReturn;
-    else if (decision === 'sell') userReturn = -stockReturn;
-    else userReturn = 0;
-
-    const grid = document.getElementById('result-grid');
-    grid.innerHTML = '';
-
-    function statEl(label, value, cls) {
-      const d = document.createElement('div');
-      d.className = 'result-stat';
-      d.innerHTML = `<div class="label">${label}</div><div class="value ${cls}">${value}</div>`;
-      return d;
-    }
-
-    const fmt = n => (n >= 0 ? '+' : '') + n.toFixed(2) + '%';
-
-    grid.appendChild(statEl(
-      'Stock move (6 mo)',
-      fmt(stockReturn),
-      stockReturn >= 0 ? 'positive' : 'negative'
-    ));
-
-    grid.appendChild(statEl(
-      'S&P 500 return',
-      spxReturn != null ? fmt(spxReturn) : 'N/A',
-      spxReturn != null ? (spxReturn >= 0 ? 'positive' : 'negative') : 'neutral'
-    ));
-
-    grid.appendChild(statEl(
-      'Your return',
-      decision === 'hold' ? '0.00% (held cash)' : fmt(userReturn),
-      decision === 'hold' ? 'neutral' : (userReturn >= 0 ? 'positive' : 'negative')
-    ));
-
-    if (spxReturn != null) {
-      const diff = userReturn - spxReturn;
-      grid.appendChild(statEl(
-        'vs S&P 500',
-        fmt(diff),
-        diff >= 0 ? 'positive' : 'negative'
-      ));
-    }
-
-    const verdict = document.getElementById('result-verdict');
-    let verdictClass, verdictText;
-
-    if (decision === 'hold') {
-      verdictClass = 'ok';
-      verdictText = spxReturn != null
-        ? `You held cash — safe play. The S&P 500 moved ${fmt(spxReturn)} in the same period.`
-        : 'You held cash — safe play.';
-    } else {
-      const diff = spxReturn != null ? userReturn - spxReturn : null;
-      if (diff != null && diff > 2) {
-        verdictClass = 'great';
-        verdictText = `Great call! You beat the S&P 500 by ${diff.toFixed(2)} percentage points.`;
-        scoreState.wins++;
-      } else if (diff != null && diff < -2) {
-        verdictClass = 'miss';
-        verdictText = `Tough break. You underperformed the S&P 500 by ${Math.abs(diff).toFixed(2)} percentage points.`;
-        scoreState.losses++;
-      } else {
-        verdictClass = 'ok';
-        verdictText = `Close match. Your return was roughly in line with the S&P 500.`;
-        if (diff != null && diff >= 0) scoreState.wins++; else scoreState.losses++;
+      let stockReturn = 0;
+      if (entryPrice > 0) {
+        stockReturn = (exitPrice - entryPrice) / entryPrice * 100;
       }
+
+      const spxReturn = meta.spx_return_pct;
+
+      let userReturn = 0;
+      if (decision === 'buy') userReturn = stockReturn;
+      else if (decision === 'sell') userReturn = -stockReturn;
+      else userReturn = 0;
+
+      const grid = document.getElementById('result-grid');
+      grid.innerHTML = '';
+
+      function statEl(label, value, cls) {
+        const d = document.createElement('div');
+        d.className = 'result-stat';
+        d.innerHTML = `<div class="label">${label}</div><div class="value ${cls}">${value}</div>`;
+        return d;
+      }
+
+      const fmt = n => (n >= 0 ? '+' : '') + n.toFixed(2) + '%';
+
+      grid.appendChild(statEl('Stock move (6 mo)', fmt(stockReturn), stockReturn >= 0 ? 'positive' : 'negative'));
+      grid.appendChild(statEl('S&P 500 return', spxReturn != null ? fmt(spxReturn) : 'N/A', spxReturn != null ? (spxReturn >= 0 ? 'positive' : 'negative') : 'neutral'));
+      grid.appendChild(statEl('Your return', decision === 'hold' ? '0.00% (held cash)' : fmt(userReturn), decision === 'hold' ? 'neutral' : (userReturn >= 0 ? 'positive' : 'negative')));
+
+      if (spxReturn != null) {
+        const diff = userReturn - spxReturn;
+        grid.appendChild(statEl('vs S&P 500', fmt(diff), diff >= 0 ? 'positive' : 'negative'));
+      }
+
+      const verdict = document.getElementById('result-verdict');
+      let verdictClass, verdictText;
+
+      if (decision === 'hold') {
+        verdictClass = 'ok';
+        verdictText = spxReturn != null
+          ? `You held cash — safe play. The S&P 500 moved ${fmt(spxReturn)} in the same period.`
+          : 'You held cash — safe play.';
+      } else {
+        const diff = spxReturn != null ? userReturn - spxReturn : null;
+        if (diff != null && diff > 2) {
+          verdictClass = 'great';
+          verdictText = `Great call! You beat the S&P 500 by ${diff.toFixed(2)} percentage points.`;
+          scoreState.wins++;
+        } else if (diff != null && diff < -2) {
+          verdictClass = 'miss';
+          verdictText = `Tough break. You underperformed the S&P 500 by ${Math.abs(diff).toFixed(2)} percentage points.`;
+          scoreState.losses++;
+        } else {
+          verdictClass = 'ok';
+          verdictText = `Close match. Your return was roughly in line with the S&P 500.`;
+          if (diff != null && diff >= 0) scoreState.wins++; else scoreState.losses++;
+        }
+      }
+
+      scoreState.played++;
+      updateScore();
+
+      verdict.className = `result-verdict ${verdictClass}`;
+      verdict.textContent = verdictText;
+
+      const badge = document.getElementById('choice-badge');
+      badge.innerHTML = `<span class="your-choice-badge ${decision}">You chose: ${decision.toUpperCase()}</span>`;
+
+      const unmaskPanel = document.getElementById('unmask-panel');
+      const ticker = meta.ticker || '';
+      const companyName = meta.company_name || ticker;
+      const year = meta.challenge_year;
+
+      if (ticker) {
+        document.getElementById('unmask-company').textContent = companyName;
+        document.getElementById('unmask-ticker').textContent = ticker;
+        document.getElementById('unmask-year').innerHTML = year ? `Challenge window: <strong>${year}–${year + 1}</strong>` : '';
+        unmaskPanel.style.display = 'block';
+      } else {
+        unmaskPanel.style.display = 'none';
+      }
+
+      document.getElementById('decision-controls').style.display = 'none';
+
+      // Fade in the result panel
+      const rp = document.getElementById('result-panel');
+      rp.classList.add('visible');
+      requestAnimationFrame(() => requestAnimationFrame(() => rp.classList.add('fade-in')));
     }
 
-    scoreState.played++;
-    updateScore();
-
-    verdict.className = `result-verdict ${verdictClass}`;
-    verdict.textContent = verdictText;
-
-    const badge = document.getElementById('choice-badge');
-    badge.innerHTML = `<span class="your-choice-badge ${decision}">You chose: ${decision.toUpperCase()}</span>`;
-
-    const unmaskPanel = document.getElementById('unmask-panel');
-    const unmaskCompany = document.getElementById('unmask-company');
-    const unmaskTicker = document.getElementById('unmask-ticker');
-    const unmaskYear = document.getElementById('unmask-year');
-
-    const ticker = meta.ticker || '';
-    const companyName = meta.company_name || ticker;
-    const year = meta.challenge_year;
-
-    if (ticker) {
-      unmaskCompany.textContent = companyName;
-      unmaskTicker.textContent = ticker;
-      unmaskYear.innerHTML = year ? `Challenge window: <strong>${year}–${year + 1}</strong>` : '';
-      unmaskPanel.style.display = 'block';
-    } else {
-      unmaskPanel.style.display = 'none';
-    }
-
-    document.getElementById('result-panel').classList.add('visible');
-    document.getElementById('decision-controls').style.display = 'none';
+    // Draw reveal candles one by one, then show outcome panel
+    const addNext = () => {
+      if (i < revealCandles.length) {
+        revealSeries.update(revealCandles[i]);
+        i++;
+        setTimeout(addNext, msPerCandle);
+      } else {
+        showOutcomePanel();
+      }
+    };
+    addNext();
   }
 
   function updateScore() {
@@ -828,6 +863,7 @@
       currentData = data;
       showChart();
       buildChart(data);
+      showFundamentals(data);
 
     } catch (e) {
       showError(`Could not load challenge: ${e.message}`);

@@ -3,4 +3,5 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 COPY . .
-CMD uvicorn artifacts/histovest/backend/main:app --host 0.0.0.0 --port $PORT
+WORKDIR /app/artifacts/histovest/backend
+CMD uvicorn main:app --host 0.0.0.0 --port $PORT
